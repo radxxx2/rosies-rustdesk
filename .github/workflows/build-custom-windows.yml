@@ -51,21 +51,24 @@ jobs:
 
           # Read Cargo.toml
           with open("Cargo.toml", "r", encoding="utf-8") as f:
-              content = f.read()
+              lines = f.readlines()
 
-          # Hotfix Custom Workspace Mappings for renamed custom forks
-          content = content.replace('default-run = "rustdesk"', '')
-          content = content.replace('default-run = "RustDesk"', '')
-
-          # Hotfix Tray Icon Upstream Dependency Mismatch (Bypasses PowerShell string parsing crash entirely)
-          content = content.replace('tray-icon = { git = "https://github.com", version = "0.21.3" }', 'tray-icon = "0.21.3"')
-          content = content.replace('tray-icon = { git = "https://github.com", branch = "dev" }', 'tray-icon = "0.21.3"')
-          content = content.replace('tray-icon = { git = "https://github.com" }', 'tray-icon = "0.21.3"')
+          new_lines = []
+          for line in lines:
+              # Remove custom workspace constraints for renamed forks
+              if 'default-run = "rustdesk"' in line or 'default-run = "RustDesk"' in line:
+                  continue
+              
+              # AGGRESSIVE HOTFIX: Catch any variations of tray-icon pointing to github and force crates.io stable version
+              if "tray-icon" in line and "git" in line:
+                  line = 'tray-icon = "0.21.3"\n'
+                  
+              new_lines.append(line)
 
           # Save corrected file
           with open("Cargo.toml", "w", encoding="utf-8") as f:
-              f.write(content)
-          print("Cargo.toml successfully patched!")
+              f.writelines(new_lines)
+          print("Cargo.toml successfully patched line-by-line!")
         shell: python
 
       - name: Synchronize Lockfile To Custom Manifest
@@ -85,7 +88,7 @@ jobs:
           RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER }}
           API_SERVER: ${{ vars.API_SERVER }}
           RS_PUB_KEY: ${{ vars.RS_PUB_KEY }}
-          # CRITICAL: Suppresses the strict new compiler lints so legacy C-pointer code doesn't trip up the build
+          # Suppresses strict lint exceptions for legacy C-pointers
           RUSTFLAGS: "-A warnings"
         run: |
           python build.py --flutter
