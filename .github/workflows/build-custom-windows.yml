@@ -1,7 +1,7 @@
 name: Build Custom Windows Client
 
 on:
-  workflow_dispatch: # This adds the "Run workflow" manual button to GitHub UI
+  workflow_dispatch: # Manual run button trigger
 
 jobs:
   build:
@@ -10,12 +10,13 @@ jobs:
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v4.1.2
+        uses: actions/checkout@v6 # Upgraded from v4 to v6 for full Node 24 support
 
       - name: Setup Flutter Toolchain
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
 
       - name: Setup Rust Compiler
         uses: dtolnay/rust-toolchain@stable
@@ -29,7 +30,7 @@ jobs:
           python build.py --flutter
 
       - name: Upload Finished Executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # Uses latest standard execution block
         with:
           name: BetterDesk-Windows-Client
           path: target/release/rustdesk.exe
