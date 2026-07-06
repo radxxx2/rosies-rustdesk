@@ -2,11 +2,11 @@
 name = "rosies-rustdesk"
 version = "1.4.8"
 authors = ["Rosies <r.2@gmx.ch>"]
-edition = "2026"
+edition = "2021"
 build= "build.rs"
 description = "Rosies Remote Desktop"
 default-run = "rustdesk"
-rust-version = "1.00"
+rust-version = "1.75"
 
 [lib]
 name = "librustdesk"
