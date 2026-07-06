@@ -14,20 +14,30 @@ jobs:
         with:
           submodules: recursive # Required for RustDesk's internal C++ repository links
 
+      - name: Setup Rust Compiler First
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable # Ensures standard 2021/2024/2026 workspace parsing capabilities
+          target: x86_64-pc-windows-msvc
+
+      - name: Force Modern Rust Binary Priority
+        run: |
+          # CRITICAL: Prepend the modern cargo paths globally so python build.py cannot use system default fallbacks
+          echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
+          echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
+          echo "C:\vcpkg" >> $GITHUB_PATH
+        shell: powershell
+
       - name: Install LLVM & System Tools
         run: |
           choco install llvm wget unzip -y
           echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
           echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
-          
-          # Map pre-installed GitHub vcpkg to system environment variables
-          echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
-          echo "C:\vcpkg" >> $GITHUB_PATH
         shell: powershell
 
       - name: Compile Static vcpkg Dependencies
         run: |
-          # Forces vcpkg to install packages globally instead of looking for vcpkg.json
+          # Bypasses internal project vcpkg manifests to expose libraries globally
           vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static --classic
         shell: powershell
 
@@ -37,20 +47,9 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Setup Rust Compiler
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable # Upgraded to absolute latest stable to ensure native 2026 edition handling
-          target: x86_64-pc-windows-msvc
-
-      - name: Force Modern Rust Binary Path
-        run: |
-          # CRITICAL: This intercepts the system path and forces python build.py to look at our modern Cargo installation first
-          echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
-        shell: powershell
-
       - name: Bootstrap Rust Bridge Codegen
         run: |
+          # Explicitly calling cargo now leverages our newly prioritized path mapping
           cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
           cd flutter
           flutter pub get
