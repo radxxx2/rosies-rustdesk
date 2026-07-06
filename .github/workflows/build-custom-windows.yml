@@ -58,9 +58,9 @@ jobs:
           content = content.replace('default-run = "RustDesk"', '')
 
           # Hotfix Tray Icon Upstream Dependency Mismatch (Bypasses PowerShell string parsing crash entirely)
-          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon", version = "0.21.3" }', 'tray-icon = "0.21.3"')
-          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon", branch = "dev" }', 'tray-icon = "0.21.3"')
-          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon" }', 'tray-icon = "0.21.3"')
+          content = content.replace('tray-icon = { git = "https://github.com", version = "0.21.3" }', 'tray-icon = "0.21.3"')
+          content = content.replace('tray-icon = { git = "https://github.com", branch = "dev" }', 'tray-icon = "0.21.3"')
+          content = content.replace('tray-icon = { git = "https://github.com" }', 'tray-icon = "0.21.3"')
 
           # Save corrected file
           with open("Cargo.toml", "w", encoding="utf-8") as f:
@@ -85,6 +85,8 @@ jobs:
           RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER }}
           API_SERVER: ${{ vars.API_SERVER }}
           RS_PUB_KEY: ${{ vars.RS_PUB_KEY }}
+          # CRITICAL: Suppresses the strict new compiler lints so legacy C-pointer code doesn't trip up the build
+          RUSTFLAGS: "-A warnings"
         run: |
           python build.py --flutter
 
