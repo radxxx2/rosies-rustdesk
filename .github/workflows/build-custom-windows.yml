@@ -44,7 +44,8 @@ jobs:
       - name: Setup Flutter Toolchain
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          # UPDATED: Pinned to 3.19.x to stop breaking Material Design UI changes from the latest Flutter channel
+          flutter-version: '3.19.x'
           cache: true
 
       - name: Patch Cargo Manifest via Python
@@ -80,16 +81,15 @@ jobs:
 
       - name: Bootstrap Rust Bridge Codegen
         run: |
-          # FIXED: Updated version to 1.80.1 to perfectly match the Cargo.lock environment
+          # UPDATED: Re-bumped to version 1.80.1 to perfectly match your Cargo environment
           cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
           
-          # Fetch Flutter dependencies first so codegen knows the structure
           cd flutter
           flutter pub get
           cd ..
           
-          # Force execute the codegen compilation step manually to ensure files exist before build.py
-          flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/bridge_generated.dart
+          # UPDATED: Adjusted output filename to 'generated_bridge.dart' so the project files find RustdeskImpl and EventToUI
+          flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/generated_bridge.dart
         shell: powershell
 
       - name: Build RustDesk Windows Client
