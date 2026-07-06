@@ -12,13 +12,23 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # CRITICAL: RustDesk will crash without its C++ submodules cloned
+          submodules: recursive # Required for RustDesk's internal C++ repository links
 
-      - name: Install LLVM, vcpkg & System Tools
+      - name: Install LLVM & System Tools
         run: |
-          choco install llvm wget unzip vcpkg -y
+          choco install llvm wget unzip -y
           echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
           echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
+          
+          # Map pre-installed GitHub vcpkg to system environment variables
+          echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
+          echo "C:\vcpkg" >> $GITHUB_PATH
+        shell: powershell
+
+      - name: Compile Static vcpkg Dependencies
+        run: |
+          # RustDesk relies on these C++ packages compiled statically for Windows 64-bit
+          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
         shell: powershell
 
       - name: Setup Flutter Toolchain
@@ -28,9 +38,9 @@ jobs:
           cache: true
 
       - name: Setup Rust Compiler
-        uses: dtolnay/rust-toolchain@stable # CHANGED: Uses stable release runner instead of master
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.78.0 # CHANGED: Updated to a completely stable modern release 
+          toolchain: 1.78.0
           targets: x86_64-pc-windows-msvc
 
       - name: Bootstrap Rust Bridge Codegen
