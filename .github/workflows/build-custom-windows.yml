@@ -30,6 +30,7 @@ jobs:
       - name: Bootstrap Rust Bridge Codegen
         run: |
           cargo install flutter_rust_bridge_codegen --version 1.75.3 --features uuid
+          cd flutter
           flutter pub get
         shell: powershell
 
@@ -39,6 +40,7 @@ jobs:
           API_SERVER: ${{ vars.API_SERVER }}
           RS_PUB_KEY: ${{ vars.RS_PUB_KEY }}
         run: |
+          # We execute python from root, but build.py will now find the project layout cleanly
           python build.py --flutter
 
       - name: Upload Finished Executable
