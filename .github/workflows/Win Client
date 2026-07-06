@@ -1,0 +1,95 @@
+name: Build Custom Windows Client
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Custom Client Exe
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Required for RustDesk's internal C++ repository links
+
+      - name: Setup Rust Compiler First
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+
+      - name: Force Modern Rust Binary Priority
+        run: |
+          echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
+          echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
+          echo "C:\vcpkg" >> $GITHUB_PATH
+        shell: powershell
+
+      - name: Install LLVM & System Tools
+        run: |
+          choco install llvm wget unzip -y
+          echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
+        shell: powershell
+
+      - name: Compile Static vcpkg Dependencies
+        run: |
+          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static --classic
+        shell: powershell
+
+      - name: Setup Flutter Toolchain
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Patch Cargo Manifest via Python
+        run: |
+          import os
+
+          # Read Cargo.toml
+          with open("Cargo.toml", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          # Hotfix Custom Workspace Mappings for renamed custom forks
+          content = content.replace('default-run = "rustdesk"', '')
+          content = content.replace('default-run = "RustDesk"', '')
+
+          # Hotfix Tray Icon Upstream Dependency Mismatch (Bypasses PowerShell string parsing crash entirely)
+          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon", version = "0.21.3" }', 'tray-icon = "0.21.3"')
+          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon", branch = "dev" }', 'tray-icon = "0.21.3"')
+          content = content.replace('tray-icon = { git = "https://github.com/tauri-apps/tray-icon" }', 'tray-icon = "0.21.3"')
+
+          # Save corrected file
+          with open("Cargo.toml", "w", encoding="utf-8") as f:
+              f.write(content)
+          print("Cargo.toml successfully patched!")
+        shell: python
+
+      - name: Synchronize Lockfile To Custom Manifest
+        run: |
+          cargo update
+        shell: powershell
+
+      - name: Bootstrap Rust Bridge Codegen
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+          cd flutter
+          flutter pub get
+        shell: powershell
+
+      - name: Build RustDesk Windows Client
+        env:
+          RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER }}
+          API_SERVER: ${{ vars.API_SERVER }}
+          RS_PUB_KEY: ${{ vars.RS_PUB_KEY }}
+        run: |
+          python build.py --flutter
+
+      - name: Upload Finished Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: BetterDesk-Windows-Client
+          path: flutter/build/windows/x64/runner/Release/
