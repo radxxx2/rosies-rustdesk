@@ -4,7 +4,7 @@ version = "1.4.8"
 authors = ["Rosies <r.2@gmx.ch>"]
 edition = "2021"
 build= "build.rs"
-description = "Rosies Remote Desktop"
+description = "Rosies RDP"
 default-run = "rustdesk"
 rust-version = "1.75"
 
