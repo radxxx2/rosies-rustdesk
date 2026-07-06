@@ -10,12 +10,15 @@ jobs:
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # CRITICAL: RustDesk will crash without its C++ submodules cloned
 
-      - name: Install LLVM & System Tools
+      - name: Install LLVM, vcpkg & System Tools
         run: |
-          choco install llvm wget unzip -y
+          choco install llvm wget unzip vcpkg -y
           echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
         shell: powershell
 
       - name: Setup Flutter Toolchain
@@ -25,13 +28,14 @@ jobs:
           cache: true
 
       - name: Setup Rust Compiler
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@stable # CHANGED: Uses stable release runner instead of master
         with:
-          toolchain: '1.75.0' # Forced compatible older compiler to bypass the Cargo.toml syntax bug
+          toolchain: 1.78.0 # CHANGED: Updated to a completely stable modern release 
+          targets: x86_64-pc-windows-msvc
 
       - name: Bootstrap Rust Bridge Codegen
         run: |
-          cargo install flutter_rust_bridge_codegen --version 1.75.3 --features uuid
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
           cd flutter
           flutter pub get
         shell: powershell
@@ -49,4 +53,3 @@ jobs:
         with:
           name: BetterDesk-Windows-Client
           path: flutter/build/windows/x64/runner/Release/
-
