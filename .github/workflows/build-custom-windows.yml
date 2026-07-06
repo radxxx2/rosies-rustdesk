@@ -27,8 +27,8 @@ jobs:
 
       - name: Compile Static vcpkg Dependencies
         run: |
-          # RustDesk relies on these C++ packages compiled statically for Windows 64-bit
-          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+          # ADDED --classic: Forces vcpkg to install packages globally instead of looking for vcpkg.json
+          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static --classic
         shell: powershell
 
       - name: Setup Flutter Toolchain
