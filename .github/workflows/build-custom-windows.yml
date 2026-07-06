@@ -25,7 +25,9 @@ jobs:
           cache: true
 
       - name: Setup Rust Compiler
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.75.0' # Forced compatible older compiler to bypass the Cargo.toml syntax bug
 
       - name: Bootstrap Rust Bridge Codegen
         run: |
@@ -40,7 +42,6 @@ jobs:
           API_SERVER: ${{ vars.API_SERVER }}
           RS_PUB_KEY: ${{ vars.RS_PUB_KEY }}
         run: |
-          # We execute python from root, but build.py will now find the project layout cleanly
           python build.py --flutter
 
       - name: Upload Finished Executable
@@ -48,3 +49,4 @@ jobs:
         with:
           name: BetterDesk-Windows-Client
           path: flutter/build/windows/x64/runner/Release/
+
