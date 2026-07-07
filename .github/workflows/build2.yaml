@@ -11,16 +11,12 @@ jobs:
     env:
       VCPKG_ROOT: C:\vcpkg
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
-      # NATIVE MACROS: This forces the Rust compiler to bake them directly into the codebase
-      RENDEZVOUS_SERVER: "23.94.112.131:21116"
-      API_SERVER: "http://23.94.112.131:21121"
-      RS_PUB_KEY: "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs="
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Required for RustDesk's internal C++ repository links
+          submodules: recursive
 
       - name: Setup Rust Compiler First
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -54,24 +50,46 @@ jobs:
       - name: Patch Cargo Manifest via Python
         run: |
           import os
-
-          # Read Cargo.toml
           with open("Cargo.toml", "r", encoding="utf-8") as f:
               lines = f.readlines()
-
           new_lines = []
           for line in lines:
               if 'default-run = "rustdesk"' in line or 'default-run = "RustDesk"' in line:
                   continue
-
               if "tray-icon" in line and "git" in line:
                   line = 'tray-icon = "0.21.3"\n'
-
               new_lines.append(line)
-
           with open("Cargo.toml", "w", encoding="utf-8") as f:
               f.writelines(new_lines)
           print("Cargo.toml successfully patched line-by-line!")
+        shell: python
+
+      - name: Hardcode Server Details into Source Code
+        run: |
+          import os
+          
+          # Target the core config file where RustDesk fallback strings are declared
+          config_path = os.path.join("libs", "hbb_common", "src", "config.rs")
+          
+          if not os.path.exists(config_path):
+              raise FileNotFoundError(f"Could not locate config file at: {config_path}")
+              
+          with open(config_path, "r", encoding="utf-8") as f:
+              content = f.read()
+          
+          # Inject custom values by modifying fallback functions or variable definitions
+          content = content.replace('pub const RENDEZVOUS_SERVER: &str = "";', 'pub const RENDEZVOUS_SERVER: &str = "23.94.112.131:21116";')
+          content = content.replace('pub const API_SERVER: &str = "";', 'pub const API_SERVER: &str = "http://23.94.112.131:21121";')
+          content = content.replace('pub const RS_PUB_KEY: &str = "";', 'pub const RS_PUB_KEY: &str = "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=";')
+          
+          # Double check alternative empty declaration formats used in newer branches
+          content = content.replace('const RENDEZVOUS_SERVER: &str = "";', 'const RENDEZVOUS_SERVER: &str = "23.94.112.131:21116";')
+          content = content.replace('const API_SERVER: &str = "";', 'const API_SERVER: &str = "http://23.94.112.131:21121";')
+          content = content.replace('const RS_PUB_KEY: &str = "";', 'const RS_PUB_KEY: &str = "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=";')
+
+          with open(config_path, "w", encoding="utf-8") as f:
+              f.write(content)
+          print("Server details successfully hardcoded into config.rs source code!")
         shell: python
 
       - name: Synchronize Lockfile To Custom Manifest
@@ -115,17 +133,17 @@ jobs:
 
       - name: Build RustDesk Windows Client
         run: |
-          # Injecting values into global execution block
-          $env:RENDEZVOUS_SERVER = "23.94.112.131:21116"
-          $env:API_SERVER = "http://23.94.112.131:21121"
-          $env:RS_PUB_KEY = "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs="
+          # Also set them globally in GitHub Runner Environment just in case
+          echo "RENDEZVOUS_SERVER=23.94.112.131:21116" >> $env:GITHUB_ENV
+          echo "API_SERVER=http://23.94.112.131:21121" >> $env:GITHUB_ENV
+          echo "RS_PUB_KEY=YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=" >> $env:GITHUB_ENV
+          
           $env:RUSTFLAGS="-A warnings"
           python build.py --flutter
         shell: powershell
 
       - name: Packaging Native Installer File
         run: |
-          # Duplicates the compiled output and forces the installer suffix trigger
           cd flutter/build/windows/x64/runner/Release/
           cp rustdesk.exe rustdesk-install.exe
         shell: powershell
