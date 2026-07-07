@@ -1,0 +1,169 @@
+name: Build Custom Windows Client
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Custom Client Exe
+    runs-on: windows-2022
+
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Required for RustDesk's internal C++ repository links
+
+      - name: Setup Rust Compiler First
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+
+      - name: Force Modern Rust Binary Priority
+        run: |
+          echo "$USERPROFILE\.cargo\bin" >> $GITHUB_PATH
+          echo "C:\vcpkg" >> $GITHUB_PATH
+          echo "C:\Program Files\LLVM\bin" >> $GITHUB_PATH
+        shell: powershell
+
+      - name: Install LLVM & System Tools
+        run: |
+          choco install llvm wget unzip -y
+        shell: powershell
+
+      - name: Compile Static vcpkg Dependencies
+        run: |
+          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static --classic
+        shell: powershell
+
+      - name: Setup Flutter Toolchain
+        uses: subosito/flutter-action@v2
+        with:
+          # Bumps to 3.22.x to support newer Material 3 properties like surfaceContainerHighest
+          flutter-version: '3.22.x'
+          cache: true
+
+      - name: Patch Cargo Manifest via Python
+        run: |
+          import os
+
+          # Read Cargo.toml
+          with open("Cargo.toml", "r", encoding="utf-8") as f:
+              lines = f.readlines()
+
+          new_lines = []
+          for line in lines:
+              # Remove custom workspace constraints for renamed forks
+              if 'default-run = "rustdesk"' in line or 'default-run = "RustDesk"' in line:
+                  continue
+
+              # AGGRESSIVE HOTFIX: Catch variations of tray-icon pointing to git and force crates.io version
+              if "tray-icon" in line and "git" in line:
+                  line = 'tray-icon = "0.21.3"\n'
+
+              new_lines.append(line)
+
+          # Save corrected file
+          with open("Cargo.toml", "w", encoding="utf-8") as f:
+              f.writelines(new_lines)
+          print("Cargo.toml successfully patched line-by-line!")
+        shell: python
+
+      - name: Synchronize Lockfile To Custom Manifest
+        run: |
+          cargo update
+        shell: powershell
+
+      - name: Bootstrap Rust Bridge Codegen
+        run: |
+          # 1. Update the process env so this specific task block definitely sees LLVM
+          $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+          $env:PATH = "C:\Program Files\LLVM\bin;" + $env:PATH
+          
+          # 2. Install the code generator
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+          
+          # 3. Patch pubspec.yaml using Python to handle existing overrides correctly
+          python -c "
+          with open('flutter/pubspec.yaml', 'r', encoding='utf-8') as f:
+              lines = f.readlines()
+          
+          out = []
+          overrides_found = False
+          for line in lines:
+              out.append(line)
+              if line.strip().startswith('dependency_overrides:'):
+                  out.append('  extended_text: 13.0.0\n')
+                  overrides_found = True
+          
+          if not overrides_found:
+              out.append('\ndependency_overrides:\n  extended_text: 13.0.0\n')
+              
+          with open('flutter/pubspec.yaml', 'w', encoding='utf-8') as f:
+              f.writelines(out)
+          print('pubspec.yaml successfully injected with extended_text override!')
+          "
+          
+          cd flutter
+          flutter pub get
+          cd ..
+          
+          # 4. Force execution of codegen compilation
+          flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/generated_bridge.dart
+        shell: powershell
+
+      - name: Inject Server Configurations & Branding
+        run: |
+          python -c "
+          import os
+
+          # 1. Hardcode Server Configuration Fallbacks
+          config_files = ['src/config.rs', 'libs/hbb_common/src/config.rs']
+          for path in config_files:
+              if not os.path.exists(path):
+                  continue
+              with open(path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              
+              content = content.replace('rendezvous_server = \"\"', 'rendezvous_server = \"23.94.112.131:21116\"')
+              content = content.replace('api_server = \"\"', 'api_server = \"http://23.94.112.131:21121\"')
+              content = content.replace('key = \"\"', 'key = \"YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=\"')
+              
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+
+          # 2. Whitelabel Global Strings (Changes title bars, service names, and registry entries)
+          files_to_rename = ['src/config.rs', 'libs/hbb_common/src/config.rs', 'src/main.rs']
+          for path in files_to_rename:
+              if not os.path.exists(path):
+                  continue
+              with open(path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              
+              # Replaces system variable references to application name
+              content = content.replace('\"RustDesk\"', '\"RonsRustDesk\"')
+              content = content.replace('\"rustdesk\"', '\"ronsrustdesk\"')
+              
+              with open(path, 'w', encoding='utf-8') as f:
+                  f.write(content)
+                  
+          print('Successfully forced hardcoded configs and RonsRustDesk branding!')
+          "
+        shell: python
+
+      - name: Build RustDesk Windows Client
+        run: |
+          $env:RUSTFLAGS="-A warnings"
+          python build.py --flutter
+        shell: powershell
+
+      - name: Upload Finished Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: RonsRustDesk-Windows-Client
+          path: flutter/build/windows/x64/runner/Release/
