@@ -44,7 +44,6 @@ jobs:
       - name: Setup Flutter Toolchain
         uses: subosito/flutter-action@v2
         with:
-          # UPDATED: Pinned to 3.19.x to stop breaking Material Design UI changes from the latest Flutter channel
           flutter-version: '3.19.x'
           cache: true
 
@@ -81,14 +80,17 @@ jobs:
 
       - name: Bootstrap Rust Bridge Codegen
         run: |
-          # UPDATED: Re-bumped to version 1.80.1 to perfectly match your Cargo environment
           cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
           
           cd flutter
+          
+          # HOTFIX: Inject dependency_overrides into pubspec.yaml to downgrade extended_text
+          # This forces a version compatible with our Flutter 3.19 environment
+          Add-Content pubspec.yaml "`ndependency_overrides:`n  extended_text: 13.0.0"
+          
           flutter pub get
           cd ..
           
-          # UPDATED: Adjusted output filename to 'generated_bridge.dart' so the project files find RustdeskImpl and EventToUI
           flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/generated_bridge.dart
         shell: powershell
 
