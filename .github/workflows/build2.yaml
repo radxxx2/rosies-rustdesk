@@ -64,36 +64,6 @@ jobs:
           print("Cargo.toml successfully patched line-by-line!")
         shell: python
 
-      - name: Hardcode Server Details into Core Network Functions
-        run: |
-          import os
-          
-          common_path = os.path.join("src", "common.rs")
-          if not os.path.exists(common_path):
-              raise FileNotFoundError(f"Could not locate core configuration file at: {common_path}")
-              
-          with open(common_path, "r", encoding="utf-8") as f:
-              content = f.read()
-          
-          # Force the fallback logic to permanently return your personal server details
-          content = content.replace(
-              'pub fn get_rendezvous_server() -> String {',
-              'pub fn get_rendezvous_server() -> String {\n    return "23.94.112.131:21116".to_string();'
-          )
-          content = content.replace(
-              'pub fn get_api_server() -> String {',
-              'pub fn get_api_server() -> String {\n    return "http://23.94.112.131:21121".to_string();'
-          )
-          content = content.replace(
-              'pub fn get_key() -> String {',
-              'pub fn get_key() -> String {\n    return "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=".to_string();'
-          )
-
-          with open(common_path, "w", encoding="utf-8") as f:
-              f.write(content)
-          print("Server details successfully integrated into core network functions!")
-        shell: python
-
       - name: Synchronize Lockfile To Custom Manifest
         run: |
           cargo update
@@ -142,6 +112,8 @@ jobs:
       - name: Packaging Native Installer File
         run: |
           cd flutter/build/windows/x64/runner/Release/
+          # Injects host and base64 key directly into the final filename layout
+          cp rustdesk.exe "rustdesk-host=23.94.112.131,key=YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs.exe"
           cp rustdesk.exe rustdesk-install.exe
         shell: powershell
 
