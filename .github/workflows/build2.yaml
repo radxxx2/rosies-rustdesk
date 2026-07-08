@@ -132,12 +132,12 @@ jobs:
         shell: powershell
 
       - name: Build RustDesk Windows Client
+        env:
+          # CRITICAL: Bound directly to this execution step for option_env! macros
+          RENDEZVOUS_SERVER: "23.94.112.131:21116"
+          API_SERVER: "http://23.94.112.131:21121"
+          RS_PUB_KEY: "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs="
         run: |
-          # Also set them globally in GitHub Runner Environment just in case
-          echo "RENDEZVOUS_SERVER=23.94.112.131:21116" >> $env:GITHUB_ENV
-          echo "API_SERVER=http://23.94.112.131:21121" >> $env:GITHUB_ENV
-          echo "RS_PUB_KEY=YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=" >> $env:GITHUB_ENV
-          
           $env:RUSTFLAGS="-A warnings"
           python build.py --flutter
         shell: powershell
