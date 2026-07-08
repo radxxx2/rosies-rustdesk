@@ -64,32 +64,34 @@ jobs:
           print("Cargo.toml successfully patched line-by-line!")
         shell: python
 
-      - name: Hardcode Server Details into Source Code
+      - name: Hardcode Server Details into Core Network Functions
         run: |
           import os
           
-          # Target the core config file where RustDesk fallback strings are declared
-          config_path = os.path.join("libs", "hbb_common", "src", "config.rs")
-          
-          if not os.path.exists(config_path):
-              raise FileNotFoundError(f"Could not locate config file at: {config_path}")
+          common_path = os.path.join("src", "common.rs")
+          if not os.path.exists(common_path):
+              raise FileNotFoundError(f"Could not locate core configuration file at: {common_path}")
               
-          with open(config_path, "r", encoding="utf-8") as f:
+          with open(common_path, "r", encoding="utf-8") as f:
               content = f.read()
           
-          # Inject custom values by modifying fallback functions or variable definitions
-          content = content.replace('pub const RENDEZVOUS_SERVER: &str = "";', 'pub const RENDEZVOUS_SERVER: &str = "23.94.112.131:21116";')
-          content = content.replace('pub const API_SERVER: &str = "";', 'pub const API_SERVER: &str = "http://23.94.112.131:21121";')
-          content = content.replace('pub const RS_PUB_KEY: &str = "";', 'pub const RS_PUB_KEY: &str = "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=";')
-          
-          # Double check alternative empty declaration formats used in newer branches
-          content = content.replace('const RENDEZVOUS_SERVER: &str = "";', 'const RENDEZVOUS_SERVER: &str = "23.94.112.131:21116";')
-          content = content.replace('const API_SERVER: &str = "";', 'const API_SERVER: &str = "http://23.94.112.131:21121";')
-          content = content.replace('const RS_PUB_KEY: &str = "";', 'const RS_PUB_KEY: &str = "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=";')
+          # Force the fallback logic to permanently return your personal server details
+          content = content.replace(
+              'pub fn get_rendezvous_server() -> String {',
+              'pub fn get_rendezvous_server() -> String {\n    return "23.94.112.131:21116".to_string();'
+          )
+          content = content.replace(
+              'pub fn get_api_server() -> String {',
+              'pub fn get_api_server() -> String {\n    return "http://23.94.112.131:21121".to_string();'
+          )
+          content = content.replace(
+              'pub fn get_key() -> String {',
+              'pub fn get_key() -> String {\n    return "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs=".to_string();'
+          )
 
-          with open(config_path, "w", encoding="utf-8") as f:
+          with open(common_path, "w", encoding="utf-8") as f:
               f.write(content)
-          print("Server details successfully hardcoded into config.rs source code!")
+          print("Server details successfully integrated into core network functions!")
         shell: python
 
       - name: Synchronize Lockfile To Custom Manifest
@@ -132,11 +134,6 @@ jobs:
         shell: powershell
 
       - name: Build RustDesk Windows Client
-        env:
-          # CRITICAL: Bound directly to this execution step for option_env! macros
-          RENDEZVOUS_SERVER: "23.94.112.131:21116"
-          API_SERVER: "http://23.94.112.131:21121"
-          RS_PUB_KEY: "YqvrjbVRZ0uU6gQanlTEw6EM+KObuIfUuNa/5aXRCPs="
         run: |
           $env:RUSTFLAGS="-A warnings"
           python build.py --flutter
